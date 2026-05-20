@@ -118,4 +118,37 @@ typedef struct _kmq_queue_t_
 kmq_queue_t;
 
 
+typedef struct _kpthread_spinlock_t_
+{
+	id_t        id;                 
+	/* system level id */
+	uint        flags;               
+	/* flags to define spinlock properties */
+	uint        ref_cnt;             
+	/* reference count */
+	kthread_q   queue;               
+	/* queue for blocked threads (if spinlock is contended) */
+	int         locked;
+	/* current locked state (1 = locked, 0 = unlocked) */
+}
+kpthread_spinlock_t;
+
+typedef struct _kpthread_rwlock_t_
+{
+	id_t        id;                 
+	/* system level id */
+	uint        flags;               
+	/* flags to define rwlock properties */
+	uint        ref_cnt;             
+	/* reference count */
+	kthread_q   read_queue;          
+	/* queue for threads waiting to read */
+	kthread_q   write_queue;         
+	/* queue for threads waiting to write */
+	int         read_count;          
+	/* number of readers currently holding the lock */
+	int         write_locked;        
+	/* 1 if the lock is being held by a writer, 0 otherwise */
+}
+kpthread_rwlock_t;
 #endif	/* _K_PTHREAD_C_ */

@@ -28,6 +28,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);
 int pthread_mutex_destroy(pthread_mutex_t * mutex);
 int pthread_mutex_lock(pthread_mutex_t *mutex);
 int pthread_mutex_unlock(pthread_mutex_t *mutex);
+int pthread_mutex_trylock(pthread_mutex_t *mutex);
 
 int pthread_mutexattr_init(pthread_mutexattr_t *attr);
 int pthread_mutexattr_destroy(pthread_mutexattr_t *attr);
@@ -49,9 +50,23 @@ int sem_init(sem_t *sem, int pshared, int value);
 int sem_destroy(sem_t *sem);
 int sem_post(sem_t *sem);
 int sem_wait(sem_t *sem);
+int sem_trywait(sem_t *sem);
 
 /*! Message queue */
 mqd_t mq_open(char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_close(mqd_t mqdes);
 int mq_send(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint msg_prio);
 ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint *msg_prio);
+
+/*! dodano */
+int pthread_spin_init(pthread_spinlock_t *lock, pthread_spinlockattr_t *attr);
+int pthread_spin_destroy(pthread_spinlock_t *lock);
+int pthread_spin_lock(pthread_spinlock_t *lock);
+int pthread_spin_trylock(pthread_spinlock_t *lock);
+int pthread_spin_unlock(pthread_spinlock_t *lock);
+
+int pthread_rwlock_init(pthread_rwlock_t *rwlock, pthread_rwlockattr_t *attr);
+int pthread_rwlock_destroy(pthread_rwlock_t *rwlock);
+int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock);
+int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock);
+int pthread_rwlock_unlock(pthread_rwlock_t *rwlock);

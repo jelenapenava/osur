@@ -18,6 +18,7 @@ int sys__pthread_mutex_init(pthread_mutex_t *mutex,
 int sys__pthread_mutex_destroy(pthread_mutex_t *mutex);
 int sys__pthread_mutex_lock(pthread_mutex_t *mutex);
 int sys__pthread_mutex_unlock(pthread_mutex_t *mutex);
+int sys__pthread_mutex_trylock(pthread_mutex_t *mutex);  
 
 int sys__pthread_cond_init(pthread_cond_t *cond, pthread_condattr_t *condattr);
 int sys__pthread_cond_destroy(pthread_cond_t *cond);
@@ -29,9 +30,24 @@ int sys__sem_init(sem_t *sem, int pshared, int value);
 int sys__sem_destroy(sem_t *sem);
 int sys__sem_wait(sem_t *sem);
 int sys__sem_post(sem_t *sem);
+int sys__sem_trywait(sem_t *sem);
 
 int sys__mq_open(char *name, int oflag, mode_t mode, mq_attr_t *attr,
 		   mqd_t *mqdes);
 int sys__mq_close(mqd_t *mqdes);
 int sys__mq_send(mqd_t *mqdes, char *msg_ptr, size_t msg_len, uint msg_prio);
 int sys__mq_receive(mqd_t *mqdes,char *msg_ptr,size_t msg_len,uint *msg_prio);
+
+/*! Spin lock operations -------------------------------------------*/
+int sys__pthread_spin_init(pthread_spinlock_t *lock, pthread_spinlockattr_t *attr);
+int sys__pthread_spin_destroy(pthread_spinlock_t *lock);
+int sys__pthread_spin_lock(pthread_spinlock_t *lock);
+int sys__pthread_spin_trylock(pthread_spinlock_t *lock);
+int sys__pthread_spin_unlock(pthread_spinlock_t *lock);
+
+/*! Read-write lock operations --------------------------------------*/
+int sys__pthread_rwlock_init(pthread_rwlock_t *rwlock, pthread_rwlockattr_t *attr);
+int sys__pthread_rwlock_destroy(pthread_rwlock_t *rwlock);
+int sys__pthread_rwlock_rdlock(pthread_rwlock_t *rwlock);
+int sys__pthread_rwlock_wrlock(pthread_rwlock_t *rwlock);
+int sys__pthread_rwlock_unlock(pthread_rwlock_t *rwlock);

@@ -23,6 +23,7 @@
  * \param arg Parameter sent to starting function
  * (parameters are on calling thread stack)
  */
+
 int sys__pthread_create(pthread_t *thread, pthread_attr_t *attr,
 			  void *(*start_routine)(void *), void *arg)
 {
@@ -393,6 +394,41 @@ int sys__pthread_mutex_unlock(pthread_mutex_t *mutex)
 	SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
 }
 
+int sys__pthread_mutex_trylock(pthread_mutex_t *mutex)
+{
+	kpthread_mutex_t *kmutex;
+	kobject_t *kobj;
+	kthread_t *kthread;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(mutex, EINVAL);
+
+	kobj = mutex->ptr;
+	ASSERT_ERRNO_AND_EXIT(kobj, EINVAL);
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+	kmutex = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(kmutex && kmutex->id == mutex->id, EINVAL);
+
+	kthread = kthread_get_active();
+
+	if (kmutex->owner == NULL)
+	{
+		kmutex->owner = kthread;
+		kthread_set_errno(kthread, EXIT_SUCCESS);
+		kthread_set_syscall_retval(kthread, EXIT_SUCCESS);
+	}
+	else
+	{
+		kthread_set_errno(kthread, EBUSY);
+		kthread_set_syscall_retval(kthread, -1);
+	}
+
+	SYS_EXIT(kthread_get_errno(NULL), kthread_get_syscall_retval(NULL));
+}
+
+
 /*! conditional variables --------------------------------------------------- */
 
 /*!
@@ -735,6 +771,48 @@ int sys__sem_post(sem_t *sem)
 	SYS_EXIT(kthread_get_errno(NULL), kthread_get_syscall_retval(NULL));
 }
 
+/*!
+ * Try to decrement (lock) semaphore without blocking
+ * \param sem Semaphore descriptor (user level descriptor)
+ * \return 0 if successful, -1 if the semaphore could not be locked
+ */
+int sys__sem_trywait(sem_t *sem)
+{
+	ksem_t *ksem;
+	kobject_t *kobj;
+	kthread_t *kthread;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(sem, EINVAL);
+
+	kthread = kthread_get_active();
+
+	kobj = sem->ptr;
+	ASSERT_ERRNO_AND_EXIT(kobj, EINVAL);
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+	ksem = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(ksem && ksem->id == sem->id, EINVAL);
+
+	/* ako je vrijednost veća od nule, smanji ju i zabilježi dretvu */
+	if (ksem->sem_value > 0)
+	{
+		ksem->sem_value--;
+		ksem->last_lock = kthread;
+
+		kthread_set_errno(kthread, EXIT_SUCCESS);
+		kthread_set_syscall_retval(kthread, EXIT_SUCCESS);
+	}
+	else
+	{
+		/* nije dostupno – vrati EAGAIN bez blokiranja */
+		kthread_set_errno(kthread, EAGAIN);
+		kthread_set_syscall_retval(kthread, -1);
+	}
+
+	SYS_EXIT(kthread_get_errno(NULL), kthread_get_syscall_retval(NULL));
+}
+
 /*! Messages ---------------------------------------------------------------- */
 
 /* list of message queues */
@@ -1028,4 +1106,311 @@ int sys__mq_receive(mqd_t *mqdes,char *msg_ptr,size_t msg_len,uint *msg_prio)
 	}
 
 	SYS_EXIT(EXIT_SUCCESS, msg_len);
+}
+
+/* spin */
+
+int sys__pthread_spin_init(pthread_spinlock_t *lock, pthread_spinlockattr_t *attr)
+{
+    kpthread_spinlock_t *klock;
+    kobject_t *kobj;
+
+    SYS_ENTRY();
+
+    ASSERT_ERRNO_AND_EXIT(lock, EINVAL);
+
+    kobj = kmalloc_kobject(sizeof(kpthread_spinlock_t));
+    ASSERT_ERRNO_AND_EXIT(kobj, ENOMEM);
+
+    klock = kobj->kobject;
+
+    klock->id = k_new_id();
+    klock->flags = 0;
+    klock->ref_cnt = 1;
+    klock->locked = 0;
+    kthreadq_init(&klock->queue);
+
+    lock->ptr = kobj;
+    lock->id = klock->id;
+
+    SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+
+int sys__pthread_spin_destroy(pthread_spinlock_t *lock)
+{
+    kpthread_spinlock_t *klock;
+    kobject_t *kobj;
+
+    SYS_ENTRY();
+
+    ASSERT_ERRNO_AND_EXIT(lock && lock->ptr, EINVAL);
+
+    kobj = lock->ptr;
+    ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+    klock = kobj->kobject;
+    ASSERT_ERRNO_AND_EXIT(klock && klock->id == lock->id, EINVAL);
+
+    ASSERT_ERRNO_AND_EXIT(
+        klock->locked == 0 &&
+        kthreadq_get(&klock->queue) == NULL,
+        EBUSY
+    );
+
+    kfree_kobject(kobj);
+    lock->ptr = NULL;
+    lock->id = 0;
+
+    SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+int sys__pthread_spin_lock(pthread_spinlock_t *lock)
+{
+    kpthread_spinlock_t *klock;
+    kobject_t *kobj;
+
+    SYS_ENTRY();
+
+    ASSERT_ERRNO_AND_EXIT(lock && lock->ptr, EINVAL);
+
+    kobj = lock->ptr;
+    ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+    klock = kobj->kobject;
+    ASSERT_ERRNO_AND_EXIT(klock && klock->id == lock->id, EINVAL);
+
+    while (__sync_lock_test_and_set(&klock->locked, 1))
+    {
+        while (klock->locked)
+            ;
+    }
+
+    SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+int sys__pthread_spin_trylock(pthread_spinlock_t *lock)
+{
+    kpthread_spinlock_t *klock;
+    kobject_t *kobj;
+
+    SYS_ENTRY();
+
+    ASSERT_ERRNO_AND_EXIT(lock && lock->ptr, EINVAL);
+
+    kobj = lock->ptr;
+    ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+    klock = kobj->kobject;
+    ASSERT_ERRNO_AND_EXIT(klock && klock->id == lock->id, EINVAL);
+
+    if (__sync_lock_test_and_set(&klock->locked, 1))
+        SYS_EXIT(EBUSY, EXIT_FAILURE);
+
+    SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+int sys__pthread_spin_unlock(pthread_spinlock_t *lock)
+{
+    kpthread_spinlock_t *klock;
+    kobject_t *kobj;
+
+    SYS_ENTRY();
+
+    ASSERT_ERRNO_AND_EXIT(lock && lock->ptr, EINVAL);
+
+    kobj = lock->ptr;
+    ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+    klock = kobj->kobject;
+    ASSERT_ERRNO_AND_EXIT(klock && klock->id == lock->id, EINVAL);
+
+    __sync_lock_release(&klock->locked);
+
+    SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+
+/* rwlock */
+
+
+int sys__pthread_rwlock_init(pthread_rwlock_t *rwlock, pthread_rwlockattr_t *rwlockattr)
+{
+	kpthread_rwlock_t *krwlock;
+	kobject_t *kobj;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(rwlock, EINVAL);
+
+	kobj = kmalloc_kobject(sizeof(kpthread_rwlock_t));
+	ASSERT_ERRNO_AND_EXIT(kobj, ENOMEM);
+
+	krwlock = kobj->kobject;
+	krwlock->id = k_new_id();
+	krwlock->flags = 0;
+	krwlock->ref_cnt = 1;
+	krwlock->read_count = 0;
+	krwlock->write_locked = 0;
+	kthreadq_init(&krwlock->read_queue);
+	kthreadq_init(&krwlock->write_queue);
+
+	rwlock->ptr = kobj;
+	rwlock->id = krwlock->id;
+
+	SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+int sys__pthread_rwlock_destroy(pthread_rwlock_t *rwlock)
+{
+	kpthread_rwlock_t *krwlock;
+	kobject_t *kobj;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(rwlock, EINVAL);
+
+	kobj = rwlock->ptr;
+	ASSERT_ERRNO_AND_EXIT(kobj, EINVAL);
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+	krwlock = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(krwlock && krwlock->id == rwlock->id, EINVAL);
+
+	ASSERT_ERRNO_AND_EXIT(
+		krwlock->write_locked == 0 &&
+		krwlock->read_count == 0 &&
+		kthreadq_get(&krwlock->read_queue) == NULL &&
+		kthreadq_get(&krwlock->write_queue) == NULL,
+		EBUSY
+	);
+
+	kfree_kobject(kobj);
+	rwlock->ptr = NULL;
+	rwlock->id = 0;
+
+	SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+}
+
+int sys__pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
+{
+	kpthread_rwlock_t *krwlock;
+	kobject_t *kobj;
+	kthread_t *self;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(rwlock && rwlock->ptr, EINVAL);
+
+	kobj = rwlock->ptr;
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+	krwlock = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(krwlock && krwlock->id == rwlock->id, EINVAL);
+
+	self = kthread_get_active();
+
+	for (;;)
+	{
+		if (!krwlock->write_locked && !kthreadq_get(&krwlock->write_queue))
+		{
+			krwlock->read_count++;
+
+			SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+		}
+
+		kthread_set_errno(self, 0);
+		kthread_set_syscall_retval(self, 0);
+
+		kthread_enqueue(self, &krwlock->read_queue, 1, NULL, NULL);
+		kthreads_schedule();
+	}
+}
+
+int sys__pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
+{
+	kpthread_rwlock_t *krwlock;
+	kobject_t *kobj;
+	kthread_t *self;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(rwlock && rwlock->ptr, EINVAL);
+
+	kobj = rwlock->ptr;
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+	krwlock = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(krwlock && krwlock->id == rwlock->id, EINVAL);
+
+	self = kthread_get_active();
+
+
+	for (;;)
+	{
+		if (!krwlock->write_locked && !krwlock->read_count)
+		{
+			krwlock->write_locked = 1;
+
+			SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+		}
+
+		kthread_set_errno(self, 0);
+		kthread_set_syscall_retval(self, 0);
+
+		kthread_enqueue(self, &krwlock->write_queue, 1, NULL, NULL);
+		kthreads_schedule();
+
+	}
+}
+
+int sys__pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
+{
+	kpthread_rwlock_t *krwlock;
+	kobject_t *kobj;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(rwlock && rwlock->ptr, EINVAL);
+
+	kobj = rwlock->ptr;
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list), EINVAL);
+
+	krwlock = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(krwlock && krwlock->id == rwlock->id, EINVAL);
+
+	if (krwlock->write_locked)
+	{
+		
+		krwlock->write_locked = 0;
+		if (kthreadq_get(&krwlock->write_queue))
+		{
+			kthreadq_release(&krwlock->write_queue);
+		}
+		else
+		{
+			while (kthreadq_get(&krwlock->read_queue))
+			{
+				kthreadq_release(&krwlock->read_queue);
+			}
+		}
+
+		kthreads_schedule();
+		SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+	}
+
+	if (krwlock->read_count > 0)
+	{
+		krwlock->read_count--;
+
+		if (!krwlock->read_count && kthreadq_get(&krwlock->write_queue))
+		{
+			kthreadq_release(&krwlock->write_queue);
+			kthreads_schedule();
+		}
+
+		SYS_EXIT(EXIT_SUCCESS, EXIT_SUCCESS);
+	}
+
+	SYS_EXIT(EINVAL, EXIT_FAILURE);
 }

@@ -140,6 +140,12 @@ int pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
 	return EXIT_SUCCESS;
 }
 
+int pthread_mutex_trylock(pthread_mutex_t *mutex)
+{
+    ASSERT_ERRNO_AND_RETURN(mutex, EINVAL);
+    return sys__pthread_mutex_trylock(mutex);
+}
+
 /*! Condition variable */
 int pthread_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
 {
@@ -200,6 +206,12 @@ int sem_wait(sem_t *sem)
 	return sys__sem_wait(sem);
 }
 
+int sem_trywait(sem_t *sem)
+{
+	ASSERT_ERRNO_AND_RETURN(sem, EINVAL);
+	return sys__sem_trywait(sem);
+}
+
 /*! Message queue */
 mqd_t mq_open(char *name, int oflag, mode_t mode, struct mq_attr *attr)
 {
@@ -234,4 +246,68 @@ ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint *msg_prio)
 				  EINVAL);
 	ASSERT_ERRNO_AND_RETURN(msg_ptr, EINVAL);
 	return sys__mq_receive(&mqdes, msg_ptr, msg_len, msg_prio);
+}
+
+/*! Spin */
+
+
+int pthread_spin_init(pthread_spinlock_t *lock, pthread_spinlockattr_t *attr)
+{
+    ASSERT_ERRNO_AND_RETURN(lock, EINVAL);
+    return sys__pthread_spin_init(lock, attr);
+}
+
+int pthread_spin_destroy(pthread_spinlock_t *lock)
+{
+    ASSERT_ERRNO_AND_RETURN(lock, EINVAL);
+    return sys__pthread_spin_destroy(lock);
+}
+
+int pthread_spin_lock(pthread_spinlock_t *lock)
+{
+    ASSERT_ERRNO_AND_RETURN(lock, EINVAL);
+    return sys__pthread_spin_lock(lock);
+}
+
+int pthread_spin_trylock(pthread_spinlock_t *lock)
+{
+    ASSERT_ERRNO_AND_RETURN(lock, EINVAL);
+    return sys__pthread_spin_trylock(lock);
+}
+
+int pthread_spin_unlock(pthread_spinlock_t *lock)
+{
+    ASSERT_ERRNO_AND_RETURN(lock, EINVAL);
+    return sys__pthread_spin_unlock(lock);
+}
+
+/*! rwlock */
+int pthread_rwlock_init(pthread_rwlock_t *rwlock, pthread_rwlockattr_t *attr)
+{
+    ASSERT_ERRNO_AND_RETURN(rwlock, EINVAL);
+    return sys__pthread_rwlock_init(rwlock, attr);
+}
+
+int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)
+{
+    ASSERT_ERRNO_AND_RETURN(rwlock, EINVAL);
+    return sys__pthread_rwlock_destroy(rwlock);
+}
+
+int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
+{
+    ASSERT_ERRNO_AND_RETURN(rwlock, EINVAL);
+    return sys__pthread_rwlock_rdlock(rwlock);
+}
+
+int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
+{
+    ASSERT_ERRNO_AND_RETURN(rwlock, EINVAL);
+    return sys__pthread_rwlock_wrlock(rwlock);
+}
+
+int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
+{
+    ASSERT_ERRNO_AND_RETURN(rwlock, EINVAL);
+    return sys__pthread_rwlock_unlock(rwlock);
 }

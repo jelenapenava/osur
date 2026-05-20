@@ -65,6 +65,16 @@ typedef descriptor_t sem_t;
 /*! Message queue */
 typedef descriptor_t mqd_t;
 
+/*! Spinlock */
+typedef descriptor_t pthread_spinlock_t;
+typedef uint pthread_spinlockattr_t;
+
+
+/*! Rwlock Lock */
+typedef descriptor_t pthread_rwlock_t;
+typedef uint pthread_rwlockattr_t;
+
+
 /*! Message queue parameters */
 typedef struct mq_attr
 {
