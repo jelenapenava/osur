@@ -31,6 +31,7 @@ int sys__sem_destroy(sem_t *sem);
 int sys__sem_wait(sem_t *sem);
 int sys__sem_post(sem_t *sem);
 int sys__sem_trywait(sem_t *sem);
+int sys__sem_wait_x(sem_t *sem, int cnt);
 
 int sys__mq_open(char *name, int oflag, mode_t mode, mq_attr_t *attr,
 		   mqd_t *mqdes);

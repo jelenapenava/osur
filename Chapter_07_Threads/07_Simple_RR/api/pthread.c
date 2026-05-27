@@ -206,6 +206,12 @@ int sem_wait(sem_t *sem)
 	return sys__sem_wait(sem);
 }
 
+int sem_wait_x(sem_t *sem, int cnt)
+{
+	ASSERT_ERRNO_AND_RETURN(sem, EINVAL);
+	return sys__sem_wait_x(sem, cnt);
+}
+
 int sem_trywait(sem_t *sem)
 {
 	ASSERT_ERRNO_AND_RETURN(sem, EINVAL);

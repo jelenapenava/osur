@@ -51,6 +51,8 @@ int sem_destroy(sem_t *sem);
 int sem_post(sem_t *sem);
 int sem_wait(sem_t *sem);
 int sem_trywait(sem_t *sem);
+int sem_wait_x(sem_t *sem, int cnt);
+
 
 /*! Message queue */
 mqd_t mq_open(char *name, int oflag, mode_t mode, struct mq_attr *attr);

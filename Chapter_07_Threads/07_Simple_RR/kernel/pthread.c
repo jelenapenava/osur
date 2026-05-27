@@ -728,6 +728,50 @@ int sys__sem_wait(sem_t *sem)
 }
 
 /*!
+ * Decrement (lock) semaphore value by cnt (if not 0 when thread is blocked)
+ * \param sem Semaphore descriptor (user level descriptor)
+ * \return 0 if successful, -1 otherwise and appropriate error number is set
+ */
+int sys__sem_wait_x(sem_t *sem, int cnt)
+{
+	ksem_t *ksem;
+	kobject_t *kobj;
+	kthread_t *kthread;
+
+	SYS_ENTRY();
+
+	ASSERT_ERRNO_AND_EXIT(sem, EINVAL);
+
+	kthread = kthread_get_active();
+
+	kobj = sem->ptr;
+	ASSERT_ERRNO_AND_EXIT(kobj, EINVAL);
+	ASSERT_ERRNO_AND_EXIT(list_find(&kobjects, &kobj->list),
+				EINVAL);
+	ksem = kobj->kobject;
+	ASSERT_ERRNO_AND_EXIT(ksem && ksem->id == sem->id, EINVAL);
+
+	kthread_set_errno(kthread, EXIT_SUCCESS);
+	kthread_set_syscall_retval(kthread, EXIT_SUCCESS);
+
+
+	if (ksem->sem_value >= cnt)
+	{
+		ksem->sem_value -= cnt;
+
+		ksem->last_lock = kthread;
+	}
+	else {
+		ksem->sem_value -= cnt;
+
+		kthread_enqueue(kthread, &ksem->queue, 1, NULL, NULL);
+		kthreads_schedule();
+	}
+
+	SYS_EXIT(kthread_get_errno(NULL), kthread_get_syscall_retval(NULL));
+}
+
+/*!
  * Increment (lock) semaphore value by 1 (or unblock one thread that is blocked)
  * \param sem Semaphore descriptor (user level descriptor)
  * \return 0 if successful, -1 otherwise and appropriate error number is set
