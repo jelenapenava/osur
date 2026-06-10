@@ -1442,7 +1442,6 @@ static int kpipe_write(void *p, kthread_t *writer)
 
     while (written < size)
     {
-        // compute used
         size_t used =
             (pipe->wpos >= pipe->rpos)
             ? (pipe->wpos - pipe->rpos)
@@ -1500,11 +1499,11 @@ static int kpipe_read(void *p, kthread_t *reader)
     kprocess_t *proc = kthread_get_process(reader);
     kpipe_queue_t *pipe;
 
-    id = *((int **) p);   p += sizeof(int *);
-    data = *((char **) p); p += sizeof(char *);
+    id   = *((int **) p);   p += sizeof(int *);
+    data = *((char **) p);  p += sizeof(char *);
     size = *((size_t *) p);
 
-    id = U2K_GET_ADR(id, proc);
+    id   = U2K_GET_ADR(id, proc);
     data = U2K_GET_ADR(data, proc);
 
     pipe = list_get(&kpipe_list, FIRST);
@@ -1513,35 +1512,39 @@ static int kpipe_read(void *p, kthread_t *reader)
 
     ASSERT_ERRNO_AND_EXIT(pipe, EBADF);
 
-    size_t r = 0;
+    size_t used =
+        (pipe->wpos >= pipe->rpos)
+        ? (pipe->wpos - pipe->rpos)
+        : (pipe->size - (pipe->rpos - pipe->wpos));
 
-    while (r == 0) // block if empty
+    // If pipe is empty -> block once
+    if (used == 0)
     {
-        size_t used =
+        kthread_enqueue(reader, &pipe->read_q, 1, NULL, NULL);
+        kthreads_schedule();
+
+        used =
             (pipe->wpos >= pipe->rpos)
             ? (pipe->wpos - pipe->rpos)
             : (pipe->size - (pipe->rpos - pipe->wpos));
 
         if (used == 0)
-        {
-            kthread_enqueue(reader, &pipe->read_q, 1, NULL, NULL);
-            kthreads_schedule();
-        }
-        else
-        {
-            size_t max = (used < size) ? used : size;
-
-            while (r < max)
-            {
-                data[r++] = pipe->buffer[pipe->rpos];
-                pipe->rpos = (pipe->rpos + 1) % pipe->size;
-            }
-
-            kthread_t *t;
-            if ((t = kthreadq_remove(&pipe->write_q, NULL)))
-                kthread_move_to_ready(t, LAST);
-        }
+            return 0;
     }
+
+    // read at most 'size' bytes
+    size_t max = (used < size) ? used : size;
+    size_t r = 0;
+
+    while (r < max)
+    {
+        data[r++] = pipe->buffer[pipe->rpos];
+        pipe->rpos = (pipe->rpos + 1) % pipe->size;
+    }
+
+    kthread_t *t;
+    if ((t = kthreadq_remove(&pipe->write_q, NULL)))
+        kthread_move_to_ready(t, LAST);
 
     return r;
 }

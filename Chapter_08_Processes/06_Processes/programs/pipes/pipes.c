@@ -50,6 +50,7 @@ void *p3_main(void *arg)
 {
 	int c1 = pipe_open(PIPE1, 10);
 	int c2 = pipe_open(PIPE2, 20);
+	printf("P3: c1=%d c2=%d\n", c1, c2);
 
 
 	if (c1 < 0 || c2 < 0)
@@ -61,7 +62,7 @@ void *p3_main(void *arg)
 	while (1)
 	{
 		char buf[5];
-
+		printf("P3: trying read C1...\n");
 		int n = pipe_read(c1, buf, 5);
 
 		if (n > 0)
@@ -69,8 +70,10 @@ void *p3_main(void *arg)
 			printf("P3 <- C1: ");
 			write(1, buf, n);
 			printf("\n");
+		} else {
+			msleep(1);
 		}
-
+		printf("P3: writing to C2\n");
 		pipe_write(c2, "ABCDEFG", 7);
 		printf("P3 -> C2: ABCDEFG\n");
 
@@ -89,6 +92,7 @@ int pipes()
 {
 	int c1 = pipe_open(PIPE1, 10);
 	int c2 = pipe_open(PIPE2, 20);
+	printf("P1: c1=%d c2=%d\n", c1, c2);
 
 	if (c1 < 0 || c2 < 0)
 	{
@@ -98,30 +102,34 @@ int pipes()
 
 	printf("P1: pipes created\n");
 
-	/* spawn P2 */
 	pthread_t t2;
 	pthread_create(&t2, NULL, p2_main, NULL);
 
-	/* spawn P3 */
 	pthread_t t3;
 	pthread_create(&t3, NULL, p3_main, NULL);
 
 	while (1)
 	{
-		/* send data to C1 */
 		pipe_write(c1, "123456", 6);
 		printf("P1 -> C1: 123456\n");
 
-		/* read 10 bytes from C2 */
 		char buf[10];
 		int total = 0;
 
 		while (total < 10)
 		{
-			int n = pipe_read(c2, buf + total, 10 - total);
+			printf("P1: waiting for C2 data...\n");
 
+			int n = pipe_read(c2, buf, 10);
+			printf("P1: read %d bytes from C2\n", n);
 			if (n > 0)
-				total += n;
+    		{
+        		total += n;
+    		}
+    		else
+    		{
+        		msleep(1);
+    		}
 		}
 
 		printf("P1 <- C2: ");
