@@ -5,7 +5,7 @@
 ENTRY(arch_startup)
 
 SECTIONS {
-	.code LOAD_ADDR :
+	.code LOAD_ADDR : AT(LOAD_ADDR)
 	{
 		kernel_code_addr = .;
 
@@ -14,18 +14,39 @@ SECTIONS {
 
 		*( .text* )
 	}
-	.data :
+	CODE_size = SIZEOF(.code);
+	DATA_ROM =  CODE_size + LOAD_ADDR;
+	.data ADDR_DATA : AT(DATA_ROM)
 	{
 		kernel_data_addr = .;
 
 		/* read only data (constants), initialized global variables */
 		* ( .rodata* .data* )
 	}
-	.bss :
+	DATA_RAM = ADDR_DATA;
+	DATA_size = SIZEOF(.data);
+	BSS_ROM =  DATA_size + DATA_ROM;
+	BSS_RAM = DATA_size + ADDR_DATA;
+	.bss BSS_RAM : AT(BSS_ROM)
 	{
 		*( .bss* COMMON* )
 
 		. = ALIGN (4096);
+	}
+	BSS_size = SIZEOF(.bss);
+	p1_ROM = BSS_ROM + BSS_size;
+
+	.p1 P1ADDR : AT(p1_ROM)
+	{
+    	p1 = .;
+    	. += P1SIZE;
+	}
+
+	p2_ROM = p1_ROM + SIZEOF(.p1);
+	.p2 P2ADDR : AT(p2_ROM)
+	{
+    	p2 = .;
+    	. += P2SIZE;
 	}
 
 	/*
@@ -36,9 +57,18 @@ SECTIONS {
 	 * - but they will be put behind "kernel_end_addr" so its best to use
 	 *   multiboot loader (QEMU is that)
 	 */
+	STACK_END = STACK_TOP - STACK_SIZE;
+	STACK_ROM = p2_ROM + SIZEOF(.p2);
+	.stack_segment STACK_END : AT(STACK_ROM)
+	{
+		* ( .stack_section* )
 
+	}
+
+	/DISCARD/ : { *(.eh_frame) }
 #ifndef DEBUG
 	/DISCARD/ : { *(*) }
+
 #endif
 	kernel_end_addr = .;
 }
