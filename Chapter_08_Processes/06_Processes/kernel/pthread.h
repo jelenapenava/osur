@@ -117,5 +117,42 @@ typedef struct _kmq_queue_t_
 }
 kmq_queue_t;
 
+/*! pipe (kernel message-stream equivalent) */
+typedef struct _kpipe_t_
+{
+    id_t       id;
+        /* system level id */
+
+    char      *name;
+        /* pipe name (optional, for named pipes) */
+
+    size_t     size;
+        /* buffer size */
+
+    size_t     rpos;
+        /* read position */
+
+    size_t     wpos;
+        /* write position */
+
+    char      *buffer;
+        /* circular buffer */
+
+    int        flags;
+        /* PIPE_BLOCKING / PIPE_NONBLOCKING */
+
+    int        ref_cnt;
+        /* number of processes that opened this pipe */
+
+    kthread_q  read_q;
+        /* threads waiting to read */
+
+    kthread_q  write_q;
+        /* threads waiting to write */
+
+    list_h     list;
+        /* all pipes are in single global list */
+}
+kpipe_queue_t;
 
 #endif	/* _K_PTHREAD_C_ */

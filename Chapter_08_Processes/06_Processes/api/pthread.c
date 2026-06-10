@@ -243,3 +243,55 @@ ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint *msg_prio)
 	ASSERT_ERRNO_AND_RETURN(msg_ptr, EINVAL);
 	return syscall(MQ_RECEIVE, &mqdes, msg_ptr, msg_len, msg_prio);
 }
+/*pipe*/
+int pipe_open(char *name, size_t size)
+{
+	pipe_t p;
+
+	if (!name)
+	{
+		set_errno(EINVAL);
+		return -1;
+	}
+
+	syscall(PIPE_OPEN, name, size, &p);
+
+	if (p.id == -1 || p.ptr == (void *) -1)
+		return -1;
+
+	return p.id;
+}
+
+/*!
+ * Write data to pipe
+ * Sends exactly size bytes, blocks if necessary
+ */
+int pipe_write(int id, char *data, size_t size)
+{
+	pipe_t p;
+
+	ASSERT_ERRNO_AND_RETURN(data, EINVAL);
+	ASSERT_ERRNO_AND_RETURN(size > 0, EINVAL);
+
+	p.id = id;
+	p.ptr = NULL;
+
+	return syscall(PIPE_WRITE, &p, data, size);
+}
+
+/*!
+ * Read data from pipe
+ * Reads up to size bytes
+ */
+int pipe_read(int id, char *data, size_t size)
+{
+	pipe_t p;
+
+	ASSERT_ERRNO_AND_RETURN(data, EINVAL);
+	ASSERT_ERRNO_AND_RETURN(size > 0, EINVAL);
+
+	p.id = id;
+	p.ptr = NULL;
+
+	return syscall(PIPE_READ, &p, data, size);
+}

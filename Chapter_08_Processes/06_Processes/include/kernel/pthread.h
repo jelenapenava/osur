@@ -32,3 +32,8 @@ int sys__mq_open(void *p);
 int sys__mq_close(void *p);
 int sys__mq_send(void *p);
 int sys__mq_receive(void *p);
+
+int sys__pipe_open(void *p);
+int sys__pipe_write(void *p);
+int sys__pipe_read(void *p);
+

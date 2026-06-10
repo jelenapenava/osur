@@ -44,6 +44,8 @@ pthread_attr_t;
 #define	PTHREAD_INHERIT_SCHED		(1<<3)
 #define	PTHREAD_SCOPE_SYSTEM		(1<<4)
 #define	PTHREAD_SCOPE_PROCESS		(1<<5)
+#define PIPE_BLOCKING		(1 << 0)
+#define PIPE_NONBLOCKING	(1 << 1)
 
 /*! Mutex */
 typedef descriptor_t pthread_mutex_t;
@@ -78,5 +80,14 @@ typedef struct mq_attr
 	     /* Number of messages currently queued */
 }
 mq_attr_t;
+
+typedef descriptor_t pipe_t;
+typedef struct pipe_attr
+{
+    int pipe_flags;     // PIPE_BLOCKING / PIPE_NONBLOCKING
+    size_t pipe_size;   // buffer size
+} pipe_attr_t;
+
+
 
 #define MQ_PRIO_MAX	255

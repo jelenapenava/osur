@@ -25,8 +25,8 @@ static void *consumer(void *param)
 {
 	int msgs, msgsize, thr_no;
 	uint msgprio;
-	char msg_buf[MSGS_PER_CONSUMERS*MAX_MSG_SIZE];/* for combined messages*/
-	char buffer[MAX_MSG_SIZE];		/* for single message */
+	char msg_buf[MSGS_PER_CONSUMERS*MAX_MSG_SIZE];
+	char buffer[MAX_MSG_SIZE];		
 
 	thr_no = (int) param;
 	msgs = 0;
@@ -129,7 +129,6 @@ int messages(char *args[])
 		pthread_create(&thread[CONSUMERS + i], NULL,
 				 producer, (void *) i+1);
 
-	/* wait that all threads completes their work */
 	for (i = 0; i < CONSUMERS + PRODUCERS; i++)
 		pthread_join(thread[i], NULL);
 

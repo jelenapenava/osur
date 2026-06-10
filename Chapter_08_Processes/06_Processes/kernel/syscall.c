@@ -11,6 +11,8 @@
 #include <kernel/memory.h>
 #include <kernel/signal.h>
 #include <kernel/time.h>
+#include <kernel/syscall.h>
+ 
 
 #include "thread.h"
 #include <arch/syscall.h>
@@ -71,6 +73,11 @@ static int(*k_sysfunc[SYSFUNCS])(void *params) =
 	sys__mq_close,
 	sys__mq_send,
 	sys__mq_receive,
+
+	sys__pipe_open,
+	sys__pipe_write,
+	sys__pipe_read,
+
 
 	sys__sigaction,
 	sys__pthread_sigmask,

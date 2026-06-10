@@ -59,3 +59,8 @@ mqd_t mq_open(char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_close(mqd_t mqdes);
 int mq_send(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint msg_prio);
 ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint *msg_prio);
+
+/*! Pipe API */
+int pipe_open(char *name, size_t size);
+int pipe_write(int id, char *data, size_t size);
+int pipe_read(int id, char *data, size_t size);

@@ -14,6 +14,10 @@
 #include <lib/string.h>
 #include <kernel/errno.h>
 
+#ifndef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
 /*! Threads ----------------------------------------------------------------- */
 
 /*!
@@ -1337,4 +1341,207 @@ static int kmq_receive(void *p, kthread_t *receiver)
 	}
 
 	return msg_len;
+}
+/*! Pipe ---------------------------------------------------------------- */
+
+static list_t kpipe_list = LIST_T_NULL;
+
+int sys__pipe_open(void *p)
+{
+    char *name;
+    size_t size;
+    int *id;
+
+    kprocess_t *proc;
+    kpipe_queue_t *pipe;
+    kobject_t *kobj;
+
+    name = *((char **) p);   p += sizeof(char *);
+    size = *((size_t *) p);  p += sizeof(size_t);
+    id   = *((int **) p);
+
+    ASSERT_ERRNO_AND_EXIT(name && id, EINVAL);
+
+    proc = kthread_get_process(NULL);
+
+    name = U2K_GET_ADR(name, proc);
+    id   = U2K_GET_ADR(id, proc);
+
+    pipe = list_get(&kpipe_list, FIRST);
+    while (pipe && strcmp(pipe->name, name))
+        pipe = list_get_next(&pipe->list);
+
+    if (!pipe)
+    {
+        pipe = kmalloc(sizeof(kpipe_queue_t));
+
+        pipe->id = k_new_id();
+        pipe->name = kmalloc(strlen(name)+1);
+        strcpy(pipe->name, name);
+
+        pipe->buffer = kmalloc(size);
+        pipe->size = size;
+
+		pipe->rpos = 0;
+		pipe->wpos = 0;
+        kthreadq_init(&pipe->read_q);
+        kthreadq_init(&pipe->write_q);
+
+        pipe->ref_cnt = 0;
+
+        list_append(&kpipe_list, pipe, &pipe->list);
+    }
+
+    pipe->ref_cnt++;
+
+    kobj = kmalloc_kobject(proc, sizeof(kpipe_queue_t *));
+    kobj->kobject = pipe;
+
+    *id = pipe->id;
+
+    return 0;
+}
+static int kpipe_write(void *p, kthread_t *writer);
+
+int sys__pipe_write(void *p)
+{
+	kthread_t *kthread = kthread_get_active();
+	int ret = kpipe_write(p, kthread);
+
+	if (ret == EXIT_SUCCESS)
+		kthread_set_errno(kthread, EXIT_SUCCESS);
+	else
+		kthread_set_errno(kthread, ret);
+
+	return (ret == EXIT_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+static int kpipe_write(void *p, kthread_t *writer)
+{
+    int *id;
+    char *data;
+    size_t size;
+
+    kprocess_t *proc = kthread_get_process(writer);
+    kpipe_queue_t *pipe;
+
+    id = *((int **) p);   p += sizeof(int *);
+    data = *((char **) p); p += sizeof(char *);
+    size = *((size_t *) p);
+
+    id = U2K_GET_ADR(id, proc);
+    data = U2K_GET_ADR(data, proc);
+
+    pipe = list_get(&kpipe_list, FIRST);
+    while (pipe && pipe->id != *id)
+        pipe = list_get_next(&pipe->list);
+
+    ASSERT_ERRNO_AND_EXIT(pipe, EBADF);
+
+    size_t written = 0;
+
+    while (written < size)
+    {
+        // compute used
+        size_t used =
+            (pipe->wpos >= pipe->rpos)
+            ? (pipe->wpos - pipe->rpos)
+            : (pipe->size - (pipe->rpos - pipe->wpos));
+
+        // wait if full
+        while (used == pipe->size)
+        {
+            kthread_enqueue(writer, &pipe->write_q, 1, NULL, NULL);
+            kthreads_schedule();
+
+            used =
+                (pipe->wpos >= pipe->rpos)
+                ? (pipe->wpos - pipe->rpos)
+                : (pipe->size - (pipe->rpos - pipe->wpos));
+        }
+
+        size_t space = pipe->size - used;
+        size_t chunk = MIN(space, size - written);
+
+        for (size_t i = 0; i < chunk; i++)
+        {
+            pipe->buffer[pipe->wpos] = data[written++];
+            pipe->wpos = (pipe->wpos + 1) % pipe->size;
+        }
+
+        kthread_t *t;
+        if ((t = kthreadq_remove(&pipe->read_q, NULL)))
+            kthread_move_to_ready(t, LAST);
+    }
+
+    return EXIT_SUCCESS;
+}
+
+static int kpipe_read(void *p, kthread_t *reader);
+int sys__pipe_read(void *p)
+{
+	kthread_t *kthread = kthread_get_active();
+	int ret = kpipe_read(p, kthread);
+
+	if (ret >= 0)
+		kthread_set_errno(kthread, EXIT_SUCCESS);
+	else
+		kthread_set_errno(kthread, -ret);
+
+	return (ret >= 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+static int kpipe_read(void *p, kthread_t *reader)
+{
+    int *id;
+    char *data;
+    size_t size;
+
+    kprocess_t *proc = kthread_get_process(reader);
+    kpipe_queue_t *pipe;
+
+    id = *((int **) p);   p += sizeof(int *);
+    data = *((char **) p); p += sizeof(char *);
+    size = *((size_t *) p);
+
+    id = U2K_GET_ADR(id, proc);
+    data = U2K_GET_ADR(data, proc);
+
+    pipe = list_get(&kpipe_list, FIRST);
+    while (pipe && pipe->id != *id)
+        pipe = list_get_next(&pipe->list);
+
+    ASSERT_ERRNO_AND_EXIT(pipe, EBADF);
+
+    size_t r = 0;
+
+    while (r == 0) // block if empty
+    {
+        size_t used =
+            (pipe->wpos >= pipe->rpos)
+            ? (pipe->wpos - pipe->rpos)
+            : (pipe->size - (pipe->rpos - pipe->wpos));
+
+        if (used == 0)
+        {
+            kthread_enqueue(reader, &pipe->read_q, 1, NULL, NULL);
+            kthreads_schedule();
+        }
+        else
+        {
+            size_t max = (used < size) ? used : size;
+
+            while (r < max)
+            {
+                data[r++] = pipe->buffer[pipe->rpos];
+                pipe->rpos = (pipe->rpos + 1) % pipe->size;
+            }
+
+            kthread_t *t;
+            if ((t = kthreadq_remove(&pipe->write_q, NULL)))
+                kthread_move_to_ready(t, LAST);
+        }
+    }
+
+    return r;
 }
