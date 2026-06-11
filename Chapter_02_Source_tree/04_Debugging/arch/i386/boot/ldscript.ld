@@ -5,7 +5,7 @@
 ENTRY(arch_startup)
 
 SECTIONS {
-	.code LOAD_ADDR : AT(LOAD_ADDR)
+	.boot LOAD_ADDR : AT(LOAD_ADDR)
 	{
 		kernel_code_addr = .;
 
@@ -15,14 +15,19 @@ SECTIONS {
 		*( .text* )
 	}
 	CODE_size = SIZEOF(.code);
-	DATA_ROM =  CODE_size + LOAD_ADDR;
+	
+
+	.rodata : {
+
+	}
 	.data ADDR_DATA : AT(DATA_ROM)
 	{
 		kernel_data_addr = .;
 
 		/* read only data (constants), initialized global variables */
-		* ( .rodata* .data* )
+		* ( .data* )
 	}
+	DATA_ROM =  CODE_size + LOAD_ADDR;
 	DATA_RAM = ADDR_DATA;
 	DATA_size = SIZEOF(.data);
 	BSS_ROM =  DATA_size + DATA_ROM;
@@ -48,6 +53,8 @@ SECTIONS {
     	p2 = .;
     	. += P2SIZE;
 	}
+
+	
 
 	/*
 	 * what with other sections generated with gcc (various versions)?
