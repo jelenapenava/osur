@@ -2,59 +2,54 @@
 
 /* Its parsed as C before used in linking! */
 
+
 ENTRY(arch_startup)
 
 SECTIONS {
-	.boot LOAD_ADDR : AT(LOAD_ADDR)
-	{
-		kernel_code_addr = .;
-
-		/* instructions */
-		*?/boot/startup.asm.o ( .text* )
-
-		*( .text* )
+	.boot LOAD_ADDR : AT(LOAD_ADDR) {
+		* ?/boot/startup.asm.o
 	}
-	CODE_size = SIZEOF(.code);
+
+	BOOT_size = SIZEOF(.boot);
+	RODATA_ROM = BOOT_size + LOAD_ADDR;
 	
-
-	.rodata : {
+	.rodata ADDR_DATA : AT(RODATA_ROM) {
+		*.o(.rodata*)
+		. = ALIGN (4096);
 
 	}
-	.data ADDR_DATA : AT(DATA_ROM)
-	{
-		kernel_data_addr = .;
 
-		/* read only data (constants), initialized global variables */
-		* ( .data* )
+	RODATA_size = SIZEOF(.rodata);
+	RODATA_RAM =  ADDR_DATA;	
+	DATA_ROM = RODATA_size + RODATA_ROM;
+	DATA_RAM = RODATA_size + RODATA_RAM;
+
+	.data DATA_RAM : AT(DATA_ROM) {
+		*.o(.data*)
+		. = ALIGN (4096);
+
 	}
-	DATA_ROM =  CODE_size + LOAD_ADDR;
-	DATA_RAM = ADDR_DATA;
+
 	DATA_size = SIZEOF(.data);
-	BSS_ROM =  DATA_size + DATA_ROM;
-	BSS_RAM = DATA_size + ADDR_DATA;
-	.bss BSS_RAM : AT(BSS_ROM)
-	{
-		*( .bss* COMMON* )
+	TEXT_ROM = DATA_size + DATA_ROM;
+	TEXT_RAM =  DATA_size + DATA_RAM;
 
+	.text TEXT_RAM : AT(TEXT_ROM) {
+		*.o(.text*)
+		. = ALIGN (4096);
+
+	}
+
+	TEXT_size = SIZEOF(.text);
+
+	BSS_ROM = TEXT_size + TEXT_ROM;
+	BSS_RAM =  TEXT_size + TEXT_RAM;
+	
+	.bss BSS_RAM : AT(BSS_ROM){
+		*.o(.bss*)
 		. = ALIGN (4096);
 	}
 	BSS_size = SIZEOF(.bss);
-	p1_ROM = BSS_ROM + BSS_size;
-
-	.p1 P1ADDR : AT(p1_ROM)
-	{
-    	p1 = .;
-    	. += P1SIZE;
-	}
-
-	p2_ROM = p1_ROM + SIZEOF(.p1);
-	.p2 P2ADDR : AT(p2_ROM)
-	{
-    	p2 = .;
-    	. += P2SIZE;
-	}
-
-	
 
 	/*
 	 * what with other sections generated with gcc (various versions)?
@@ -65,7 +60,7 @@ SECTIONS {
 	 *   multiboot loader (QEMU is that)
 	 */
 	STACK_END = STACK_TOP - STACK_SIZE;
-	STACK_ROM = p2_ROM + SIZEOF(.p2);
+	STACK_ROM = BSS_ROM + BSS_size;
 	.stack_segment STACK_END : AT(STACK_ROM)
 	{
 		* ( .stack_section* )
@@ -73,9 +68,5 @@ SECTIONS {
 	}
 
 	/DISCARD/ : { *(.eh_frame) }
-#ifndef DEBUG
-	/DISCARD/ : { *(*) }
 
-#endif
-	kernel_end_addr = .;
 }

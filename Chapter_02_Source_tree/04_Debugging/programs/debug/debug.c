@@ -13,10 +13,10 @@ static int inc(int n)
 }
 static int x=5;
 static int y;
-
+/*
 extern char p1[];
 extern char p2[];
-
+*/
 
 int debug()
 {
@@ -58,12 +58,12 @@ int debug()
 	LOG(INFO, " b (STACK) is at   %x", &b);
 	LOG(INFO, " c (STACK) is at   %x", &c);
 	printf("\n");
-
+/*
 	LOG(INFO, "p1 region start              %x", &p1);
 	LOG(INFO, "p1[2] char '%c' at %x", p1[2], &p1[2]);
 	LOG(INFO, "p2 region start              %x", &p2);
 	LOG(INFO, "p2[2] char '%c' at %x", p2[2], &p2[2]);
-
+*/
 
 
 	ASSERT_ERRNO_AND_RETURN(TRUE, EINVAL);

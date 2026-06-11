@@ -1,0 +1,9 @@
+
+build/04_Debugging.elf:     file format elf32-little
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .boot         00006778  00100000  00100000  00001000  2**5
+                  CONTENTS, ALLOC, LOAD, CODE
+  1 .bss          00000888  00306778  00106778  00007778  2**0
+                  ALLOC

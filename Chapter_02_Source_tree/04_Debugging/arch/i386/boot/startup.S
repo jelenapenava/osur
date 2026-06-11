@@ -5,7 +5,7 @@
 #include <arch/multiboot.h>
 
 /* stack, startup function */
-.extern system_stack, k_startup, arch_descriptors_init, premjesti
+.extern system_stack, k_startup, arch_descriptors_init , premjesti
 
 .section .text
 

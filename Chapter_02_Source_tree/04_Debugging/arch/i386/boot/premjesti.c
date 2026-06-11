@@ -1,4 +1,3 @@
-/* Copy code and data from ROM to RAM + init p1/p2 */
 
 #include <types/basic.h>
 
@@ -12,6 +11,10 @@
 
 extern char DATA_ROM, DATA_RAM, DATA_size;
 extern char BSS_ROM, BSS_RAM, BSS_size;
+extern char TEXT_ROM, TEXT_RAM, TEXT_size;
+extern char RODATA_ROM, RODATA_RAM, RODATA_size;
+
+
 
 void just_copy(char *from, char *to, size_t size)
 {
@@ -20,16 +23,11 @@ void just_copy(char *from, char *to, size_t size)
 }
 
 void premjesti()
-{
+{	just_copy(&RODATA_ROM, &RODATA_RAM, (size_t)&RODATA_size);
 	just_copy(&DATA_ROM, &DATA_RAM, (size_t)&DATA_size);
+	just_copy(&TEXT_ROM, &TEXT_RAM, (size_t)&TEXT_size);
 	just_copy(&BSS_ROM, &BSS_RAM, (size_t)&BSS_size);
 
-	unsigned char *p1 = (unsigned char *)P1ADDR;
-	unsigned char *p2 = (unsigned char *)P2ADDR;
 
-	for (size_t i = 0; i < P1SIZE; i++)
-		p1[i] = VALUE;
-
-	for (size_t i = 0; i < P2SIZE; i++)
-		p2[i] = VALUE;
 }
+
