@@ -21,6 +21,7 @@ static void msleep(int sec)
     sleep_time.tv_nsec = 0;
     nanosleep(&sleep_time, NULL);
 }
+
 void *p2_main(void *arg)
 {
 	int c1 = pipe_open(PIPE1, 10);
